@@ -20,6 +20,16 @@
             margin: 20px;
             font-size: 1.2em;
         }
+        button {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            right: 0;
+            top: 0;
+            font-size: 1.2em;
+            padding: 10px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -39,7 +49,7 @@
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
         
         // indirect mode settings
-        const iterations = 10000;
+        const iterations = 1000;
         const subIterations = 5;
         const rendersEvery = 500;
 
@@ -249,6 +259,7 @@
         }
 
         // direct update loop
+        let t = 0;
         const update = () => {
 
             let updateTime = updateDistances();
@@ -256,11 +267,11 @@
 
             setStats('frame time: ' + (updateTime * 0.001).toFixed(2) + 's | points: ' + points.length);
 
+            ++t;
             requestAnimationFrame(update);
         };
 
         // results update loop
-        let t = 0;
         const results = () => {
 
             for (let mT = t + subIterations; t < mT; ++t) {
@@ -282,6 +293,32 @@
 
         if (direct) update();
         else results();
+
+        // export to json
+        let exportButton = document.createElement('button');
+        exportButton.innerHTML = 'Export to json';
+        exportButton.addEventListener('click', () => {
+            let json = JSON.stringify({
+                t: t,
+                count: points.length,
+                date: Date.now(),
+                points: points
+            }, null, 4);
+
+            // adapted from https://stackoverflow.com/a/35251739
+            let blob = new Blob([json], {type: 'application/json'});
+            let dlink = document.createElement('a');
+            dlink.download = name;
+            dlink.href = window.URL.createObjectURL(blob);
+            dlink.onclick = function(e) {
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(this.href);
+                }, 1500);
+            };
+            dlink.click();
+            dlink.remove();
+        });
+        document.body.append(exportButton);
 
     </script>
 </body>
