@@ -28,7 +28,7 @@
         const numCirclePoints = 300;
         const radius = 1.0;
         const noise = 0.2;
-        const direct = false;
+        const direct = true;
         const iterations = 1000; // only in indirect mode
 
         // modify document style
@@ -49,16 +49,25 @@
         scene.background = new THREE.Color('white');
         const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.1, 10);
 
-        // init mesh
+        // init mesh - points are ordered in order of insertion, not in any render/connection order
         let points = [];
         const pushPoint = (x, y, idx = null) => {
+            if (idx === null) {
+                idx = Math.max(points.length - 1, 0);
+            }
             let pt = {
                 position: new THREE.Vector2(x, y),
                 velocity: new THREE.Vector2(0, 0),
                 accel: new THREE.Vector2(0, 0),
-                n: Math.random() * 2 - 1 // -1..1
+                n: Math.random() * 2 - 1, // -1..1
+                prev: idx,
+                next: points.length > 0 ? points[idx].next : idx
             };
-            points.splice(idx === null ? points.length : idx, 0, pt);
+            if (points.length > 0) {
+                points[pt.prev].next = points.length;
+                points[pt.next].prev = points.length;
+            }
+            points.push(pt);
         };
         let circlePoints = [];
         for (let i = 0; i < numCirclePoints; ++i) {
@@ -70,6 +79,15 @@
         circlePoints.push(circlePoints[0].clone());
         const staticLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(circlePoints), new THREE.LineBasicMaterial({ color: 'red' }));
         scene.add(staticLine);
+        
+        // function to add a node between two random neighbours
+        const addNode = () => {
+            let idx = Math.floor(Math.random() * points.length);
+            let point = points[idx];
+            let next = points[point.next];
+            let p = point.position.clone().lerp(next.position, 0.5);
+            pushPoint(p.x, p.y, idx);
+        };
 
         // refresh mesh rendering from points
         const geometry = new THREE.BufferGeometry();
@@ -77,9 +95,12 @@
         scene.add(line);
         const refresh = () => {
             let vertices = [];
-            for (let i = 0; i < points.length; ++i) {
-                vertices.push(new THREE.Vector3(points[i].position.x, points[i].position.y, -1));
-            }
+            let current = 0;
+            do {
+                let point = points[current];
+                vertices.push(new THREE.Vector3(point.position.x, point.position.y, -1));
+                current = point.next;
+            } while (current != 0);
             vertices.push(new THREE.Vector3(points[0].position.x, points[0].position.y, -1));
             geometry.setFromPoints(vertices);
             renderer.render(scene, camera);
@@ -113,7 +134,7 @@
                     let towards = new THREE.Vector2().subVectors(other.position, point.position);
                     let d = towards.length();
                     d *= (1 + point.n * noise);
-                    if ((j - i + 1) % points.length == 0 || (j - i - 1) % points.length == 0) {
+                    if (j == point.prev || j == point.next) {
                         // neighbour
                         point.accel.add(towards.normalize().multiplyScalar(d - attractionMagnitude)); // negative if close to target, positive if far from target
                     } else {
@@ -133,15 +154,6 @@
                 point.velocity.add(point.accel.clone().multiplyScalar(dt));
                 point.position.add(point.velocity.clone().multiplyScalar(dt)).clampLength(0, radius);
             }
-        };
-
-        // add a node
-        const addNode = () => {
-            let idx = Math.floor(Math.random() * points.length);
-            let point = points[idx];
-            let next = points[(idx - 1 + points.length) % points.length];
-            let p = point.position.clone().lerp(next.position, 0.5);
-            pushPoint(p.x, p.y, idx);
         };
 
         // bind events
