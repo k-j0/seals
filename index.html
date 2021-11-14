@@ -11,7 +11,6 @@
             border: none;
             margin: 0;
             padding: 0;
-            overflow: hidden;
         }
         canvas { margin: auto; }
     </style>
@@ -29,12 +28,23 @@
         const numCirclePoints = 300;
         const radius = 0.9;
         const noise = 0.2;
+        const direct = false;
+        const iterations = 2000; // only in indirect mode
+
+        // modify document style
+        if (direct) {
+            document.body.style.overflow = 'hidden';
+        }
 
         // init renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        const sz = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
-        renderer.setSize(sz, sz);
-        document.body.append(renderer.domElement);
+        if (direct) {
+            const sz = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
+            renderer.setSize(sz, sz);
+            document.body.append(renderer.domElement);
+        } else {
+            renderer.setSize(512, 512);
+        }
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('white');
         const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
@@ -73,6 +83,14 @@
             vertices.push(new THREE.Vector3(points[0].position.x, points[0].position.y, -1));
             geometry.setFromPoints(vertices);
             renderer.render(scene, camera);
+            if (!direct) {
+                const src = renderer.domElement.toDataURL();
+                const img = document.createElement('img');
+                img.src = src;
+                img.style.width = '256px';
+                img.style.height = '256px';
+                document.body.append(img);
+            }
         };
         refresh();
 
@@ -127,17 +145,19 @@
         };
 
         // bind events
-        document.addEventListener('keypress', (e) => {
-            e = e || window.event;
-            if (e.key == ' ') {
+        if (direct) {
+            document.addEventListener('keypress', (e) => {
+                e = e || window.event;
+                if (e.key == ' ') {
+                    for(let i = 0; i < 20; ++i) addNode();
+                }
+            });
+            document.addEventListener('click', () => {
                 for(let i = 0; i < 20; ++i) addNode();
-            }
-        });
-        document.addEventListener('click', () => {
-            for(let i = 0; i < 20; ++i) addNode();
-        });
+            });
+        }
 
-        // update loop
+        // direct update loop
         const update = () => {
 
             updateDistances();
@@ -145,7 +165,29 @@
 
             requestAnimationFrame(update);
         };
-        update();
+
+        // results update loop
+        let t = 0;
+        const results = () => {
+            ++t;
+
+            for (let j = 0; j < 5; ++j) {
+                for (let mT = t + 80; t < mT; ++t) {
+                    updateDistances();
+                }
+                for(let i = 0; i < 50; ++i) addNode();
+            }
+            refresh();
+
+            if (t < iterations) {
+                requestAnimationFrame(results);
+            } else {
+                document.body.append(document.createTextNode('100% done.'));
+            }
+        }
+
+        if (direct) update();
+        else results();
 
     </script>
 </body>
