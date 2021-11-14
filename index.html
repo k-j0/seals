@@ -28,16 +28,20 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
         // simulation params
-        const attractionMagnitude = 0.01; // this is a distance
+        const attractionMagnitude = 0.0025; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 2.5;
         const dampening = 0.75;
         const dt = 0.5;
         const noise = 0.25;
-        const numPoints = 300;
-        const direct = true;
-        const iterations = 1000; // only in indirect mode
+        const numPoints = 1000;
+        const direct = false;
+        const newNodesCount = 50;
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
-        console.log('Repulsion magnitude:', repulsionMagnitude, '| Grid cell size:', 0.5/gridResolution, '| Grid resolution:', gridResolution);
+        
+        // indirect mode settings
+        const iterations = 10000;
+        const subIterations = 5;
+        const rendersEvery = 500;
 
         // rendering constants
         const numCirclePoints = 60;
@@ -65,7 +69,7 @@
             renderer.setSize(sz, sz);
             document.body.append(renderer.domElement);
         } else {
-            renderer.setSize(512, 512);
+            renderer.setSize(1024, 1024);
         }
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('white');
@@ -236,11 +240,11 @@
             document.addEventListener('keypress', (e) => {
                 e = e || window.event;
                 if (e.key == ' ') {
-                    for(let i = 0; i < 20; ++i) addNode();
+                    for(let i = 0; i < newNodesCount; ++i) addNode();
                 }
             });
             document.addEventListener('click', () => {
-                for(let i = 0; i < 20; ++i) addNode();
+                for(let i = 0; i < newNodesCount; ++i) addNode();
             });
         }
 
@@ -258,17 +262,17 @@
         // results update loop
         let t = 0;
         const results = () => {
-            ++t;
 
-            for (let j = 0; j < 5; ++j) {
-                for (let mT = t + 80; t < mT; ++t) {
-                    updateDistances();
-                }
-                for(let i = 0; i < 50; ++i) addNode();
+            for (let mT = t + subIterations; t < mT; ++t) {
+                updateDistances();
             }
-            refresh();
+            for(let i = 0; i < newNodesCount; ++i) addNode();
 
-            if (t < iterations) {
+            if (t % rendersEvery == 0) {
+                refresh();
+            }
+
+            if (t <= iterations) {
                 setStats(parseInt(t / iterations * 100) + '%');
                 requestAnimationFrame(results);
             } else {
