@@ -11,8 +11,15 @@
             border: none;
             margin: 0;
             padding: 0;
+            font-family: sans-serif;
         }
         canvas { margin: auto; }
+        span {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            font-size: 1.2em;
+        }
     </style>
 </head>
 <body>
@@ -29,17 +36,27 @@
         const numPoints = 300;
         const direct = true;
         const iterations = 1000; // only in indirect mode
+        const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
+        console.log('Repulsion magnitude:', repulsionMagnitude, '| Grid cell size:', 0.5/gridResolution, '| Grid resolution:', gridResolution);
 
         // rendering constants
         const numCirclePoints = 60;
         const radius = 1.0;
 
 
+        let grid = [];
+        let points = [];
+
 
         // modify document style
         if (direct) {
             document.body.style.overflow = 'hidden';
         }
+        let stats = document.createElement('span');
+        document.body.append(stats);
+        const setStats = (str) => {
+            stats.innerHTML = str;
+        };
 
         // init renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -54,8 +71,49 @@
         scene.background = new THREE.Color('white');
         const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.1, 10);
 
+        // spatial acceleration data structure
+        for (let i = 0; i < gridResolution; ++i) {
+            grid.push([]);
+            for (let j = 0; j < gridResolution; ++j) {
+                grid[i].push([]);
+            }
+        }
+        const clearGrid = () => {
+            for (let i = 0; i < gridResolution; ++i)
+            for (let j = 0; j < gridResolution; ++j) {
+                grid[i][j] = [];
+            }
+        };
+        const assignGridPt = (idx) => {
+            let x = parseInt((points[idx].position.x + 1) * gridResolution * 0.5);
+            let y = parseInt((points[idx].position.y + 1) * gridResolution * 0.5);
+            grid[x][y].push(idx);
+        };
+        const gridNeighbours = (idx) => {
+            let subX = parseInt((points[idx].position.x + 1) * gridResolution);
+            let subY = parseInt((points[idx].position.y + 1) * gridResolution);
+            let x = parseInt(subX * 0.5);
+            let y = parseInt(subY * 0.5);
+            let lr = subX % 2 == 0 ? x - 1 : x + 1;
+            let tb = subY % 2 == 0 ? y - 1 : y + 1;
+            
+            let c = 0;
+            let neighbours = grid[x][y];
+            if (lr >= 0 && lr < gridResolution) {
+                neighbours = neighbours.concat(grid[lr][y]);
+                ++c;
+            }
+            if (tb >= 0 && tb < gridResolution) {
+                neighbours = neighbours.concat(grid[x][tb]);
+                ++c;
+            }
+            if (c >= 2) {
+                neighbours = neighbours.concat(grid[lr][tb]);
+            }
+            return neighbours;
+        };
+
         // init mesh - points are ordered in order of insertion, not in any render/connection order
-        let points = [];
         const pushPoint = (x, y, idx = null) => {
             if (idx === null) {
                 idx = Math.max(points.length - 1, 0);
@@ -73,6 +131,7 @@
                 points[pt.next].prev = points.length;
             }
             points.push(pt);
+            assignGridPt(points.length - 1);
         };
         let circlePoints = [];
         for (let i = 0; i < numCirclePoints; ++i) {
@@ -126,6 +185,7 @@
 
         // update nodes based on distance
         const updateDistances = () => {
+            let startTime = performance.now();
 
             // attract towards neighbours + push away from others
             for (let i = 0; i < points.length; ++i) {
@@ -136,8 +196,10 @@
                     let d = (radius * 0.9 - point.position.length()) / radius;
                     point.accel.add(point.position.clone().multiplyScalar(-d * d * 0.5));
                 }
-                // iterate over other points
-                for (let j = 0; j < points.length; ++j) {
+                // iterate over other points (within grid)
+                let others = gridNeighbours(i);
+                for (let gridJ = 0; gridJ < others.length; ++gridJ) {
+                    let j = others[gridJ];
                     if (j == i) continue;
                     let other = points[j];
                     let towards = new THREE.Vector2().subVectors(other.position, point.position);
@@ -157,12 +219,16 @@
             }
 
             // update point positions
+            clearGrid();
             for (let i = 0; i < points.length; ++i) {
                 let point = points[i];
                 point.accel.add(point.velocity.clone().multiplyScalar(-dampening));
                 point.velocity.add(point.accel.clone().multiplyScalar(dt));
                 point.position.add(point.velocity.clone().multiplyScalar(dt)).clampLength(0, radius);
+                assignGridPt(i);
             }
+
+            return performance.now() - startTime;
         };
 
         // bind events
@@ -181,8 +247,10 @@
         // direct update loop
         const update = () => {
 
-            updateDistances();
+            let updateTime = updateDistances();
             refresh();
+
+            setStats('frame time: ' + (updateTime * 0.001).toFixed(2) + 's | points: ' + points.length);
 
             requestAnimationFrame(update);
         };
@@ -201,9 +269,10 @@
             refresh();
 
             if (t < iterations) {
+                setStats(parseInt(t / iterations * 100) + '%');
                 requestAnimationFrame(results);
             } else {
-                document.body.append(document.createTextNode('100% done.'));
+                setStats('Done.');
             }
         }
 
