@@ -26,10 +26,10 @@
         const dampening = 0.75;
         const dt = 0.5;
         const numCirclePoints = 300;
-        const radius = 0.9;
+        const radius = 1.0;
         const noise = 0.2;
         const direct = false;
-        const iterations = 2000; // only in indirect mode
+        const iterations = 1000; // only in indirect mode
 
         // modify document style
         if (direct) {
@@ -47,7 +47,7 @@
         }
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('white');
-        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+        const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.1, 10);
 
         // init mesh
         let points = [];
