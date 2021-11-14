@@ -22,12 +22,13 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
         // constants
-        const attractionMagnitude = 0.02; // this is a distance btw
+        const attractionMagnitude = 0.01; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 3;
         const dampening = 0.75;
         const dt = 0.5;
-        const numCirclePoints = 180;
+        const numCirclePoints = 300;
         const radius = 0.9;
+        const noise = 0.2;
 
         // init renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -44,7 +45,8 @@
             let pt = {
                 position: new THREE.Vector2(x, y),
                 velocity: new THREE.Vector2(0, 0),
-                accel: new THREE.Vector2(0, 0)
+                accel: new THREE.Vector2(0, 0),
+                n: Math.random() * 2 - 1 // -1..1
             };
             points.splice(idx === null ? points.length : idx, 0, pt);
         };
@@ -92,6 +94,7 @@
                     let other = points[j];
                     let towards = new THREE.Vector2().subVectors(other.position, point.position);
                     let d = towards.length();
+                    d *= (1 + point.n * noise);
                     if ((j - i + 1) % points.length == 0 || (j - i - 1) % points.length == 0) {
                         // neighbour
                         point.accel.add(towards.normalize().multiplyScalar(d - attractionMagnitude)); // negative if close to target, positive if far from target
