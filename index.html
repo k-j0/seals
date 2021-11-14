@@ -20,16 +20,21 @@
 
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
-        // constants
+        // simulation params
         const attractionMagnitude = 0.01; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 3;
         const dampening = 0.75;
         const dt = 0.5;
-        const numCirclePoints = 300;
-        const radius = 1.0;
         const noise = 0.2;
+        const numPoints = 300;
         const direct = true;
         const iterations = 1000; // only in indirect mode
+
+        // rendering constants
+        const numCirclePoints = 60;
+        const radius = 1.0;
+
+
 
         // modify document style
         if (direct) {
@@ -73,8 +78,12 @@
         for (let i = 0; i < numCirclePoints; ++i) {
             let angle = i * Math.PI * 2 / numCirclePoints;
             let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
-            pushPoint(p.x * 0.9, p.y * 0.9);
             circlePoints.push(new THREE.Vector3(p.x, p.y, -1));
+        }
+        for (let i = 0; i < numPoints; ++i) {
+            let angle = i * Math.PI * 2 / numPoints;
+            let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
+            pushPoint(p.x * 0.9, p.y * 0.9);
         }
         circlePoints.push(circlePoints[0].clone());
         const staticLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(circlePoints), new THREE.LineBasicMaterial({ color: 'red' }));
