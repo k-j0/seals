@@ -39,12 +39,12 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
         // simulation params
-        const attractionMagnitude = 0.025; // this is a distance
+        const attractionMagnitude = 0.005; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 2.5;
         const dampening = 0.75;
         const dt = 0.5;
         const noise = 0.25;
-        const numPoints = 160;
+        const numPoints = 500;
         const direct = true;
         const newNodesCount = 50;
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
@@ -209,7 +209,7 @@
             // attract towards neighbours + push away from others
             for (let i = 0; i < points.length; ++i) {
                 let point = points[i];
-                point.accel.set(0, 0);
+                point.accel.multiplyScalar(0.25);
                 point.velocity.multiplyScalar(dampening);
                 if (point.position.length() >= radius * 0.9) {
                     let d = (radius * 0.9 - point.position.length()) / radius;
@@ -241,7 +241,7 @@
             clearGrid();
             for (let i = 0; i < points.length; ++i) {
                 let point = points[i];
-                point.accel.add(point.velocity.clone().multiplyScalar(-dampening));
+                point.accel.add(point.velocity.clone().multiplyScalar(-dampening)); // friction
                 point.velocity.add(point.accel.clone().multiplyScalar(dt));
                 point.position.add(point.velocity.clone().multiplyScalar(dt)).clampLength(0, radius);
                 assignGridPt(i);
