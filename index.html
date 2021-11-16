@@ -33,23 +33,24 @@
     </style>
 </head>
 <body>
+    <input type="file" id="import"/>
     <script type='module'>
 
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
         // simulation params
-        const attractionMagnitude = 0.0025; // this is a distance
+        const attractionMagnitude = 0.025; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 2.5;
         const dampening = 0.75;
         const dt = 0.5;
         const noise = 0.25;
-        const numPoints = 1000;
-        const direct = false;
+        const numPoints = 160;
+        const direct = true;
         const newNodesCount = 50;
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
         
         // indirect mode settings
-        const iterations = 1000;
+        const iterations = 15000;
         const subIterations = 5;
         const rendersEvery = 500;
 
@@ -101,6 +102,8 @@
         const assignGridPt = (idx) => {
             let x = parseInt((points[idx].position.x + 1) * gridResolution * 0.5);
             let y = parseInt((points[idx].position.y + 1) * gridResolution * 0.5);
+            if (x < 0) x = 0; if (x >= gridResolution) x = gridResolution-1;
+            if (y < 0) y = 0; if (y >= gridResolution) y = gridResolution-1;
             grid[x][y].push(idx);
         };
         const gridNeighbours = (idx) => {
@@ -108,6 +111,8 @@
             let subY = parseInt((points[idx].position.y + 1) * gridResolution);
             let x = parseInt(subX * 0.5);
             let y = parseInt(subY * 0.5);
+            if (x < 0) x = 0; if (x >= gridResolution) x = gridResolution-1;
+            if (y < 0) y = 0; if (y >= gridResolution) y = gridResolution-1;
             let lr = subX % 2 == 0 ? x - 1 : x + 1;
             let tb = subY % 2 == 0 ? y - 1 : y + 1;
             
@@ -319,6 +324,26 @@
             dlink.remove();
         });
         document.body.append(exportButton);
+
+        // import from json
+        document.getElementById('import').addEventListener('change', (e) => {
+            let input = event.target;
+
+            let reader = new FileReader();
+            reader.onload = () => {
+                let result = JSON.parse(reader.result);
+                t = result.t;
+                points = result.points;
+                for(let i = 0; i < points.length; ++i) {
+                    points[i].position = new THREE.Vector2(points[i].position.x, points[i].position.y);
+                    points[i].velocity = new THREE.Vector2(points[i].velocity.x, points[i].velocity.y);
+                    points[i].accel = new THREE.Vector2(points[i].accel.x, points[i].accel.y);
+                }
+                clearGrid();
+                refresh();
+            };
+            reader.readAsText(input.files[0]);
+        });
 
     </script>
 </body>
