@@ -41,7 +41,7 @@
         // simulation params
         const attractionMagnitude = 0.005; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 2.5;
-        const dampening = 0.75;
+        const dampening = 0.5;
         const dt = 0.5;
         const noise = 0.25;
         const numPoints = 500;
@@ -209,8 +209,7 @@
             // attract towards neighbours + push away from others
             for (let i = 0; i < points.length; ++i) {
                 let point = points[i];
-                point.accel.multiplyScalar(0.25);
-                point.velocity.multiplyScalar(dampening);
+                point.accel.multiplyScalar(.25);
                 if (point.position.length() >= radius * 0.9) {
                     let d = (radius * 0.9 - point.position.length()) / radius;
                     point.accel.add(point.position.clone().multiplyScalar(-d * d * 0.5));
@@ -230,8 +229,7 @@
                     } else {
                         // other point
                         if (d < repulsionMagnitude) {
-                            let force = (repulsionMagnitude - d);
-                            point.accel.add(towards.normalize().multiplyScalar(-force));
+                            point.accel.add(towards.normalize().multiplyScalar(d - repulsionMagnitude));
                         }
                     }
                 }
@@ -241,7 +239,8 @@
             clearGrid();
             for (let i = 0; i < points.length; ++i) {
                 let point = points[i];
-                point.accel.add(point.velocity.clone().multiplyScalar(-dampening)); // friction
+                point.velocity.multiplyScalar(dampening);
+                point.accel.add(point.velocity.clone().multiplyScalar(-1)); // friction
                 point.velocity.add(point.accel.clone().multiplyScalar(dt));
                 point.position.add(point.velocity.clone().multiplyScalar(dt)).clampLength(0, radius);
                 assignGridPt(i);
