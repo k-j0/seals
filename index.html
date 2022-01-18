@@ -39,20 +39,21 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
         // simulation params
-        const attractionMagnitude = 0.01; // this is a distance
+        const attractionMagnitude = 0.015; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 1.5;
         const dampening = 0.5;
         const dt = 0.5;
         const noise = 0.25;
-        const numPoints = 500;
-        const direct = true;
-        const newNodesCount = 50;
+        const numPoints = 300;
+        const initialRadius = 0.9;
+        const newNodesCount = 20;
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
         
+        const direct = false;
         // indirect mode settings
-        const iterations = 15000;
+        const iterations = 5000;
         const subIterations = 5;
-        const rendersEvery = 500;
+        const rendersEvery = 150;
 
         // rendering constants
         const numCirclePoints = 60;
@@ -161,7 +162,7 @@
         for (let i = 0; i < numPoints; ++i) {
             let angle = i * Math.PI * 2 / numPoints;
             let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
-            pushPoint(p.x * 0.9, p.y * 0.9);
+            pushPoint(p.x * initialRadius, p.y * initialRadius);
         }
         circlePoints.push(circlePoints[0].clone());
         const staticLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(circlePoints), new THREE.LineBasicMaterial({ color: 'red' }));
@@ -209,7 +210,7 @@
             // attract towards neighbours + push away from others
             for (let i = 0; i < points.length; ++i) {
                 let point = points[i];
-                point.accel.multiplyScalar(.25);
+                point.accel.multiplyScalar(dampening * dampening);
                 if (point.position.length() >= radius * 0.9) {
                     let d = (radius * 0.9 - point.position.length()) / radius;
                     point.accel.add(point.position.clone().multiplyScalar(-d * d * 0.5));
@@ -222,12 +223,12 @@
                     let other = points[j];
                     let towards = new THREE.Vector2().subVectors(other.position, point.position);
                     let d = towards.length();
-                    d *= (1 + point.n * noise);
                     if (j == point.prev || j == point.next) {
                         // neighbour
                         point.accel.add(towards.normalize().multiplyScalar(d - attractionMagnitude)); // negative if close to target, positive if far from target
                     } else {
                         // other point
+                        d *= (1 + point.n * noise);
                         if (d < repulsionMagnitude) {
                             point.accel.add(towards.normalize().multiplyScalar(d - repulsionMagnitude));
                         }
