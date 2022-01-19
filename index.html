@@ -39,25 +39,27 @@
         import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
         // simulation params
-        const attractionMagnitude = 0.015; // this is a distance
+        const attractionMagnitude = 0.02; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 1.5;
         const dampening = 0.5;
         const dt = 0.5;
         const noise = 0.25;
-        const numPoints = 300;
-        const initialRadius = 0.9;
-        const newNodesCount = 20;
+        const numPoints = 10;
+        const initialRadius = 0.1;
+        const initialOffsetX = 10;
+        const newNodesCount = 1;
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
         
         const direct = false;
         // indirect mode settings
-        const iterations = 5000;
+        const iterations = 12500;
         const subIterations = 5;
-        const rendersEvery = 150;
+        const rendersEvery = 250;
+        const outerGrowthRate = 1 + 3e-4;
 
         // rendering constants
         const numCirclePoints = 60;
-        const radius = 1.0;
+        let radius = 0.2;
 
 
         let grid = [];
@@ -153,20 +155,11 @@
             points.push(pt);
             assignGridPt(points.length - 1);
         };
-        let circlePoints = [];
-        for (let i = 0; i < numCirclePoints; ++i) {
-            let angle = i * Math.PI * 2 / numCirclePoints;
-            let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
-            circlePoints.push(new THREE.Vector3(p.x, p.y, -1));
-        }
         for (let i = 0; i < numPoints; ++i) {
             let angle = i * Math.PI * 2 / numPoints;
-            let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
+            let p = new THREE.Vector2(Math.cos(angle) + initialOffsetX, Math.sin(angle)).multiplyScalar(radius);
             pushPoint(p.x * initialRadius, p.y * initialRadius);
         }
-        circlePoints.push(circlePoints[0].clone());
-        const staticLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(circlePoints), new THREE.LineBasicMaterial({ color: 'red' }));
-        scene.add(staticLine);
         
         // function to add a node between two random neighbours
         const addNode = () => {
@@ -180,8 +173,21 @@
         // refresh mesh rendering from points
         const geometry = new THREE.BufferGeometry();
         const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 'black' }));
+        const circleGeometry = new THREE.BufferGeometry();
+        const circle = new THREE.Line(circleGeometry, new THREE.LineBasicMaterial({ color: 'red' }));
         scene.add(line);
+        scene.add(circle);
         const refresh = () => {
+
+            let circlePoints = [];
+            for (let i = 0; i < numCirclePoints; ++i) {
+                let angle = i * Math.PI * 2 / numCirclePoints;
+                let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
+                circlePoints.push(new THREE.Vector3(p.x, p.y, -1));
+            }
+            circlePoints.push(circlePoints[0].clone());
+            circleGeometry.setFromPoints(circlePoints);
+            
             let vertices = [];
             let current = 0;
             do {
@@ -246,6 +252,7 @@
                 point.position.add(point.velocity.clone().multiplyScalar(dt)).clampLength(0, radius);
                 assignGridPt(i);
             }
+            points[0].position.set(radius, 0);
 
             return performance.now() - startTime;
         };
@@ -256,6 +263,8 @@
                 e = e || window.event;
                 if (e.key == ' ') {
                     for(let i = 0; i < newNodesCount; ++i) addNode();
+                } else if (e.key == 'g') {
+                    radius *= 1.01;
                 }
             });
             document.addEventListener('click', () => {
@@ -281,6 +290,8 @@
 
             for (let mT = t + subIterations; t < mT; ++t) {
                 updateDistances();
+                radius *= outerGrowthRate;
+                radius = Math.min(radius, 1);
             }
             for(let i = 0; i < newNodesCount; ++i) addNode();
 
@@ -289,7 +300,7 @@
             }
 
             if (t <= iterations) {
-                setStats(parseInt(t / iterations * 100) + '%');
+                setStats(parseInt(t / iterations * 100) + '% (' + t + '/' + iterations + ')');
                 requestAnimationFrame(results);
             } else {
                 setStats('Done.');
