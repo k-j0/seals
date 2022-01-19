@@ -49,13 +49,14 @@
         const initialOffsetX = 10;
         const newNodesCount = 1;
         const gridResolution = Math.ceil(0.25 / Math.max(repulsionMagnitude, attractionMagnitude));
+        const renderAsSvg = true;
         
         const direct = false;
         // indirect mode settings
-        const iterations = 12500;
+        const iterations = 25000;
         const subIterations = 5;
         const rendersEvery = 250;
-        const outerGrowthRate = 1 + 3e-4;
+        const outerGrowthRate = 1 + 2e-4;
 
         // rendering constants
         const numCirclePoints = 60;
@@ -75,19 +76,6 @@
         const setStats = (str) => {
             stats.innerHTML = str;
         };
-
-        // init renderer
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        if (direct) {
-            const sz = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
-            renderer.setSize(sz, sz);
-            document.body.append(renderer.domElement);
-        } else {
-            renderer.setSize(1024, 1024);
-        }
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color('white');
-        const camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.1, 10);
 
         // spatial acceleration data structure
         for (let i = 0; i < gridResolution; ++i) {
@@ -170,41 +158,106 @@
             pushPoint(p.x, p.y, idx);
         };
 
+        // init renderer
+        let renderer, scene, camera, geometry, line, circleGeometry, circle;
+        let svgCanvas, svgCtx;
+        if (!renderAsSvg) {
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            if (direct) {
+                const sz = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
+                renderer.setSize(sz, sz);
+                document.body.append(renderer.domElement);
+            } else {
+                renderer.setSize(1024, 1024);
+            }
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('white');
+            camera = new THREE.OrthographicCamera(-1.05, 1.05, 1.05, -1.05, 0.1, 10);
+
+            geometry = new THREE.BufferGeometry();
+            line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 'black' }));
+            circleGeometry = new THREE.BufferGeometry();
+            circle = new THREE.Line(circleGeometry, new THREE.LineBasicMaterial({ color: 'red' }));
+            scene.add(line);
+            scene.add(circle);
+
+        } else {
+            svgCanvas = document.createElement('canvas');
+            const sz = window.innerWidth > window.innerHeight ? window.innerHeight : window.innerWidth;
+            svgCanvas.width = direct ? sz : 1024;
+            svgCanvas.height = direct ? sz : 1024;
+            svgCtx = svgCanvas.getContext('2d');
+            if (direct) {
+                document.body.append(svgCanvas);
+            }
+        }
+
         // refresh mesh rendering from points
-        const geometry = new THREE.BufferGeometry();
-        const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({ color: 'black' }));
-        const circleGeometry = new THREE.BufferGeometry();
-        const circle = new THREE.Line(circleGeometry, new THREE.LineBasicMaterial({ color: 'red' }));
-        scene.add(line);
-        scene.add(circle);
         const refresh = () => {
 
-            let circlePoints = [];
-            for (let i = 0; i < numCirclePoints; ++i) {
-                let angle = i * Math.PI * 2 / numCirclePoints;
-                let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
-                circlePoints.push(new THREE.Vector3(p.x, p.y, -1));
-            }
-            circlePoints.push(circlePoints[0].clone());
-            circleGeometry.setFromPoints(circlePoints);
-            
-            let vertices = [];
-            let current = 0;
-            do {
-                let point = points[current];
-                vertices.push(new THREE.Vector3(point.position.x, point.position.y, -1));
-                current = point.next;
-            } while (current != 0);
-            vertices.push(new THREE.Vector3(points[0].position.x, points[0].position.y, -1));
-            geometry.setFromPoints(vertices);
-            renderer.render(scene, camera);
-            if (!direct) {
-                const src = renderer.domElement.toDataURL();
-                const img = document.createElement('img');
-                img.src = src;
-                img.style.width = '256px';
-                img.style.height = '256px';
-                document.body.append(img);
+            if (!renderAsSvg) {
+
+                let circlePoints = [];
+                for (let i = 0; i < numCirclePoints; ++i) {
+                    let angle = i * Math.PI * 2 / numCirclePoints;
+                    let p = new THREE.Vector2(Math.cos(angle), Math.sin(angle)).multiplyScalar(radius);
+                    circlePoints.push(new THREE.Vector3(p.x, p.y, -1));
+                }
+                circlePoints.push(circlePoints[0].clone());
+                circleGeometry.setFromPoints(circlePoints);
+                
+                let vertices = [];
+                let current = 0;
+                do {
+                    let point = points[current];
+                    vertices.push(new THREE.Vector3(point.position.x, point.position.y, -1));
+                    current = point.next;
+                } while (current != 0);
+                vertices.push(new THREE.Vector3(points[0].position.x, points[0].position.y, -1));
+                geometry.setFromPoints(vertices);
+                renderer.render(scene, camera);
+                if (!direct) {
+                    const src = renderer.domElement.toDataURL();
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.style.width = '256px';
+                    img.style.height = '256px';
+                    document.body.append(img);
+                }
+
+            } else {
+
+                svgCtx.clearRect(0, 0, svgCanvas.width, svgCanvas.height);
+
+                svgCtx.fillStyle = '#000';
+                svgCtx.strokeStyle = '#f00';
+                svgCtx.beginPath();
+                svgCtx.arc(svgCanvas.width/2, svgCanvas.height/2, svgCanvas.width * radius * 0.5, 0, 2 * Math.PI);
+                svgCtx.fill();
+                svgCtx.stroke();
+
+                svgCtx.fillStyle = '#bbb';
+                svgCtx.strokeStyle = '#000';
+                let path = 'M ';
+                let current = 0;
+                do {
+                    let point = points[current];
+                    path += parseInt((point.position.x * 0.5 + 0.5) * svgCanvas.width) + ' ' + parseInt((point.position.y * 0.5 + 0.5) * svgCanvas.height) + ' ';
+                    current = point.next;
+                    if (current == 0) path += 'Z';
+                    else path += 'L ';
+                } while (current != 0);
+                svgCtx.fill(new Path2D(path));
+                svgCtx.stroke(new Path2D(path));
+
+                if (!direct) {
+                    const src = svgCanvas.toDataURL();
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.style.width = img.style.height = '256px';
+                    document.body.append(img);
+                }
+
             }
         };
         refresh();
