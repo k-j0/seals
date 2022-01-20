@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seals Voronoi</title>
+
+    <style>
+        * {
+            border: none;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        span {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            font-size: 1.2em;
+        }
+        button {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            right: 0;
+            top: 0;
+            font-size: 1.2em;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <script type='module'>
+
+        import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
+        
+        function sphericalToCartesian (phi, theta) {
+            theta *= Math.PI;
+            phi *= 2 * Math.PI;
+            return new THREE.Vector3(Math.cos(phi) * Math.sin(theta), Math.sin(phi) * Math.sin(theta), Math.cos(theta));
+        }
+
+        // Generate mock points on surface
+        let particles = [];
+        for (let i = 0; i < 50; ++i) {
+            particles.push({
+                uv: [ Math.random(), Math.random() ],
+                colour: [ Math.random(), Math.random(), Math.random() ]
+            });
+        }
+        const refreshParticleUVs = () => {
+            for (let i = 0; i < particles.length; ++i) {
+                particles[i].sphericalUV = sphericalToCartesian(particles[i].uv[0], particles[i].uv[1]);
+            }
+        };
+        refreshParticleUVs();
+
+        // Closest particle (index) to any point on the sphere, greater circle distance
+        function closestParticle (sphericalPos) {
+            let d = Infinity;
+            let closest = 0;
+            let n1 = sphericalPos;
+            for (let i = 0; i < particles.length; ++i) {
+                let n2 = particles[i].sphericalUV;
+                let dist = Math.acos(n1.dot(n2));
+                if (dist < d) {
+                    d = dist;
+                    closest = i;
+                }
+            }
+            return closest;
+        }
+
+        // Whether 2 particles should be considered neighbours
+        function neighbours (i, j) {
+            let p1 = particles[i].sphericalUV;
+            let p2 = particles[j].sphericalUV;
+            let midpoint = p1.clone().add(p2).multiplyScalar(0.5);
+            if (midpoint.x == 0 && midpoint.y == 0) return false;
+            midpoint.normalize();
+            let c = closestParticle(midpoint);
+            return c == i || c == j;
+        }
+
+
+        
+        // Init renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.append(renderer.domElement);
+        const camera = new THREE.OrthographicCamera(-0.05, 1.05, 1.05, -0.05, 0.1, 10);
+
+        function refresh () {
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color('black');
+
+            refreshParticleUVs();
+
+            // Display points
+            {
+                const geometry = new THREE.BufferGeometry();
+                geometry.setFromPoints(particles.map((p) => new THREE.Vector3(p.uv[0], p.uv[1], -1) ));
+                geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(particles.map((p) => [p.colour[0], p.colour[1], p.colour[2]] ).flat()), 3));
+                const mesh = new THREE.Points(geometry, new THREE.PointsMaterial({
+                    color: 'white',
+                    vertexColors: true,
+                    sizeAttenuation: false,
+                    size: 5
+                }));
+                scene.add(mesh);
+            }
+
+            // Outlines
+            {
+                const geometry = new THREE.BufferGeometry();
+                geometry.setFromPoints(particles.map((p) => new THREE.Vector3(p.uv[0], p.uv[1], -2) ));
+                const mesh = new THREE.Points(geometry, new THREE.PointsMaterial({
+                    color: 'white',
+                    sizeAttenuation: false,
+                    size: 7
+                }));
+                scene.add(mesh);
+            }
+
+            // Voronoi cells
+            {
+                const geometry = new THREE.BufferGeometry();
+                let vertices = [];
+                let colours = [];
+                for (let x = 0; x < 1; x += 0.001) {
+                    for (let y = 0; y < 1; y += 0.002) {
+                        vertices.push(x, y, -3);
+                        let c = particles[closestParticle(sphericalToCartesian(x, y))].colour;
+                        colours.push(c[0], c[1], c[2]);
+                    }
+                }
+                geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colours), 3));
+                const mesh = new THREE.Points(geometry, new THREE.PointsMaterial({
+                    color: 'grey',
+                    vertexColors: true,
+                    sizeAttenuation: false,
+                    size: 2
+                }));
+                scene.add(mesh);
+            }
+
+            // Neighbour lines
+            {
+                const geometry = new THREE.BufferGeometry();
+                let vertices = [];
+                for (let i = 0; i < particles.length; ++i) {
+                    for (let j = i + 1; j < particles.length; ++j) {
+                        if (neighbours(i, j)) {
+                            vertices.push(particles[i].uv[0], particles[i].uv[1], -1.5);
+                            vertices.push(particles[j].uv[0], particles[j].uv[1], -1.5);
+                        }
+                    }
+                }
+                geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+                const mesh = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 'white' }));
+                scene.add(mesh);
+            }
+
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        refresh();
+        renderer.domElement.addEventListener('click', () => {
+            particles.push({
+                uv: [ Math.random(), Math.random() ],
+                colour: [ Math.random(), Math.random(), Math.random() ]
+            });
+            refresh();
+        });
+
+    </script>
+</body>
+</html>
