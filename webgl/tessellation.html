@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seals Tessellation</title>
+
+    <style>
+        * {
+            border: none;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        span {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            font-size: 1.2em;
+        }
+        button {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            right: 0;
+            top: 0;
+            font-size: 1.2em;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <script type='module'>
+        
+        import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
+        
+        // initial geometry
+        const defaultGeo = () => {
+            let geometry = new THREE.IcosahedronGeometry(1.4, 0);
+            let indexMap = new Map();
+            let indices = [];
+            let vertices = [];
+            let uvs = [];
+            let addVert = (x, y, z) => {
+                let key = x.toFixed(2) + ',' + y.toFixed(2) + ',' + z.toFixed(2);
+                if (indexMap.has(key)) {
+                    let idx = indexMap.get(key);
+                    indices.push(idx);
+                    return;
+                }
+                let idx = vertices.length / 3;
+                vertices.push(x, y, z);
+                indices.push(idx);
+                indexMap.set(key, idx);
+            };
+            let origVerts = geometry.getAttribute('position').array;
+            for (let i = 0; i < origVerts.length / 3; ++i) {
+                addVert(origVerts[i*3], origVerts[i*3+1], origVerts[i*3+2]);
+            }
+            geometry = new THREE.BufferGeometry();
+            geometry.setIndex(indices);
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+            return geometry;
+        };
+        const originalGeo = defaultGeo();
+        let indices = [...originalGeo.getIndex().array];
+        let vertices = [...originalGeo.getAttribute('position').array];
+        let edges = [];
+        for (let i = 0; i < vertices.length; i += 3) {
+            edges.push(new Set());
+        }
+        const appendConnections = (a, b) => {
+            edges[a].add(b);
+            edges[b].add(a);
+        }
+        for (let i = 0; i < indices.length; i += 3) {
+            const a = indices[i];
+            const b = indices[i+1];
+            const c = indices[i+2];
+            appendConnections(a, b);
+            appendConnections(b, c);
+            appendConnections(c, a);
+        }
+        
+        // prepare rendering resources
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.append(renderer.domElement);
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('white');
+        const mesh = new THREE.Mesh(originalGeo, new THREE.MeshBasicMaterial({ color: 'black', wireframe: true }));
+        mesh.position.z = -3;
+        mesh.rotation.x = 0.7;
+        scene.add(mesh);
+        const mesh2 = new THREE.Mesh(originalGeo, new THREE.MeshBasicMaterial({ color: 'grey', opacity: 0.85, transparent: true }));
+        mesh2.position.z = -3;
+        mesh2.rotation.x = 0.7;
+        scene.add(mesh2);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100);
+        const render = () => {
+            mesh.rotation.y += 0.005;
+            mesh2.rotation.y += 0.005;
+            renderer.render(scene, camera);
+            window.requestAnimationFrame(render);
+        }; render();
+        
+        
+        // adds a single vertex, resulting in subdivisions on the mesh
+        function addVert() {
+            
+            // get a random vertex in the edge (vert -> vert[]) map
+            const a = parseInt(Math.random() * edges.length);
+            const b = [...edges[a]][parseInt(Math.random() * edges[a].size)];
+            const c = vertices.length / 3;
+            vertices.push((vertices[a*3] + vertices[b*3]) * 0.5, (vertices[a*3+1] + vertices[b*3+1]) * 0.5, (vertices[a*3+2] + vertices[b*3+2]) * 0.5);
+            // update edge map
+            edges.push(new Set());
+            edges[a].delete(b); edges[b].delete(a);
+            edges[a].add(c);    edges[b].add(c);
+            edges[c].add(a);    edges[c].add(b);
+            // replace any tris sharing edge [a,b] with two tris ( (a, b, f) -> (a, c, f) + (c, b, f) )
+            for (let i = 0; i < indices.length; i += 3) {
+                const d = indices[i];
+                const e = indices[i+1];
+                const f = indices[i+2];
+                if ((d == a && e == b) || (d == b && e == a)) { // tri with F
+                    indices[i] = c; // replace with a, c, f
+                    indices.push(d, c, f); // add b, c, f
+                    edges[c].add(f);    edges[f].add(c);
+                } else if ((e == a && f == b) || (e == b && f == a)) { // tri with D
+                    indices[i+1] = c; // replace with d, c, a
+                    indices.push(d, e, c); // add d, c, b
+                    edges[c].add(d);    edges[d].add(c);
+                } else if ((f == a && d == b) || (f == b && d == a)) { // tri with E
+                    indices[i+2] = c; // replace with a, e, c
+                    indices.push(f, c, e); // add b, e, c
+                    edges[c].add(e);    edges[e].add(c);
+                }
+            }
+            
+            // refresh rendering res
+            let newGeo = new THREE.BufferGeometry();
+            newGeo.setIndex(indices);
+            newGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+            mesh.geometry = mesh2.geometry = newGeo;
+        }
+        
+        
+        for (let i = 0; i < 10000; ++i) {
+            addVert();
+        }
+        
+        // update geo on keypress
+        let d = true;
+        document.addEventListener('keypress', (e) => {
+            e = e || window.event;
+            if (e.key == ' ') {
+                addVert();
+            }
+        });
+        
+    </script>
+</body>
+</html>
