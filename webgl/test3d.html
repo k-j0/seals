@@ -44,10 +44,10 @@
         
         
         // sim params
-        const attractionMagnitude = 0.2;
+        const attractionMagnitude = 0.075;
         const repulsionMagnitude = attractionMagnitude * 1.5;
-        const dampening = 0.25;
-        const dt = 0.25;
+        const dampening = 0.15;
+        const dt = 0.15;
         const radius = 1.5;
         
         
@@ -150,7 +150,7 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.append(renderer.domElement);
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color('lightblue');
+        scene.background = new THREE.Color('brown');
         const mesh = new THREE.Mesh(tess.geo, new THREE.MeshBasicMaterial({ color: 'black', wireframe: true }));
         mesh.position.z = -3;
         mesh.rotation.x = 0.7;
@@ -165,18 +165,27 @@
         scene.add(new THREE.AmbientLight('#333'));
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100);
         const render = () => {
-            updatePositions();
-            mesh.rotation.y += 0.005;
-            mesh2.rotation.y += 0.005;
+            mesh.rotation.y += 0.001;
+            mesh2.rotation.y += 0.001;
             renderer.render(scene, camera);
             window.requestAnimationFrame(render);
         }; render();
         
-        
-        // pre-tessellate a few times
-        for (let i = 0; i < 800; ++i) {
-            mesh.geometry = mesh2.geometry = addVert(tess, true);
-        }
+        // Refresh mesh
+        let limit = 10500;
+        const refresh = () => {
+            --limit;
+            if (limit < 0) {
+                scene.background = new THREE.Color('lightblue');
+                return;
+            }
+            if (limit > 500 && limit % 5 == 0) {
+                mesh.geometry = mesh2.geometry = addVert(tess, true);
+            }
+            updatePositions();
+            window.requestAnimationFrame(refresh);
+        };
+        refresh();
         
         
         // update geo on keypress
