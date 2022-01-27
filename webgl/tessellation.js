@@ -2,8 +2,8 @@
 import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 
 
-function defaultGeo () {
-    let geometry = new THREE.IcosahedronGeometry(1.4, 0);
+function defaultGeo (radius) {
+    let geometry = new THREE.IcosahedronGeometry(radius, 0);
     let indexMap = new Map();
     let indices = [];
     let vertices = [];
@@ -27,13 +27,14 @@ function defaultGeo () {
     geometry = new THREE.BufferGeometry();
     geometry.setIndex(indices);
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+    geometry.computeVertexNormals();
     return geometry;
 };
 
 
 // creates the initial mesh & resources to tessellate
-export function initialTessellatedGeometry () {
-    const originalGeo = defaultGeo();
+export function initialTessellatedGeometry (radius = 1.4) {
+    const originalGeo = defaultGeo(radius);
     let indices = [...originalGeo.getIndex().array];
     let vertices = [...originalGeo.getAttribute('position').array];
     let edges = [];
@@ -63,7 +64,9 @@ export function initialTessellatedGeometry () {
 
 
 // adds a single vertex, resulting in subdivisions on the mesh
-export function addVert(tess) {
+export function addVert(tess, updateNormals = false) {
+    
+    tess.vertices = [...tess.geo.getAttribute('position').array];
             
     // get a random vertex in the edge (vert -> vert[]) map
     const a = parseInt(Math.random() * tess.edges.length);
@@ -96,8 +99,9 @@ export function addVert(tess) {
     }
     
     // refresh rendering res
-    let geo = new THREE.BufferGeometry();
-    geo.setIndex(tess.indices);
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(tess.vertices), 3));
-    return geo;
+    tess.geo = new THREE.BufferGeometry();
+    tess.geo.setIndex(tess.indices);
+    tess.geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(tess.vertices), 3));
+    if (updateNormals) tess.geo.computeVertexNormals();
+    return tess.geo;
 }

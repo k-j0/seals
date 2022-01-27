@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seals Tessellation</title>
+
+    <style>
+        * {
+            border: none;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        span {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            font-size: 1.2em;
+        }
+        button {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            right: 0;
+            top: 0;
+            font-size: 1.2em;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <script type='module'>
+        
+        import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
+        import { initialTessellatedGeometry, addVert } from './tessellation.js';
+        
+        
+        // sim params
+        const attractionMagnitude = 0.2;
+        const repulsionMagnitude = attractionMagnitude * 1.5;
+        const dampening = 0.25;
+        const dt = 0.25;
+        const radius = 1.5;
+        
+        
+        // initial geometry
+        const tess = initialTessellatedGeometry(attractionMagnitude);
+        
+        
+        // update positions
+        let velocity = [];
+        let acceleration = [];
+        function updatePositions () {
+            
+            // ensure enough accel/velocity slots
+            while (velocity.length < tess.vertices.length) {
+                velocity.push(0);
+            }
+            while (acceleration.length < tess.vertices.length) {
+                acceleration.push(0);
+            }
+            
+            const vertices = tess.geo.attributes.position.array;
+            
+            // attract towards neighbours + repel from others
+            for (let i = 0; i < vertices.length; i += 3) {
+                const x = vertices[i];
+                const y = vertices[i+1];
+                const z = vertices[i+2];
+                
+                // dampen accel
+                acceleration[i] *= dampening * dampening;
+                acceleration[i+1] *= dampening * dampening;
+                acceleration[i+2] *= dampening * dampening;
+                
+                // boundary
+                const posLen = Math.sqrt(x*x + y*y + z*z);
+                if (posLen >= radius * 0.9) {
+                    const d = (radius * 0.9 - posLen) / radius;
+                    acceleration[i]   += -x * d * d * 0.5;
+                    acceleration[i+1] += -y * d * d * 0.5;
+                    acceleration[i+2] += -z * d * d * 0.5;
+                }
+                
+                // iterate over other points
+                for (let j = 0; j < vertices.length; j += 3) {
+                    if (j == i) continue;
+                    const oX = vertices[j];
+                    const oY = vertices[j+1];
+                    const oZ = vertices[j+2];
+                    
+                    // other - current
+                    const towards = new THREE.Vector3(oX - x, oY - y, oZ - z);
+                    let d = towards.length();
+                    if (tess.edges[i/3].has(j/3)) {
+                        // neighbour
+                        const addAccel = towards.normalize().multiplyScalar(d - attractionMagnitude);
+                        acceleration[i] += addAccel.x;
+                        acceleration[i+1] += addAccel.y;
+                        acceleration[i+2] += addAccel.z;
+                    } else {
+                        // other point
+                        // @todo: add noise to d
+                        if (d < repulsionMagnitude) {
+                            const addAccel = towards.normalize().multiplyScalar(d - repulsionMagnitude);
+                            acceleration[i] += addAccel.x;
+                            acceleration[i+1] += addAccel.y;
+                            acceleration[i+2] += addAccel.z;
+                        }
+                    }
+                }
+            }
+            
+            // update point positions
+            for (let i = 0; i < vertices.length; i += 3) {
+                
+                // dampen velocity
+                velocity[i] *= dampening;
+                velocity[i+1] *= dampening;
+                velocity[i+2] *= dampening;
+                
+                // apply acceleration
+                velocity[i] += acceleration[i] * dt;
+                velocity[i+1] += acceleration[i+1] * dt;
+                velocity[i+2] += acceleration[i+2] * dt;
+                
+                // apply velocity
+                let pos = new THREE.Vector3(vertices[i] + velocity[i] * dt, vertices[i+1] + velocity[i+1] * dt, vertices[i+2] + velocity[i+2] * dt);
+                pos.clampLength(0, radius);
+                vertices[i] = pos.x;
+                vertices[i+1] = pos.y;
+                vertices[i+2] = pos.z;
+            }
+            
+            tess.geo.attributes.position.needsUpdate = true;
+            tess.geo.computeVertexNormals();
+        }
+        
+        
+        // prepare rendering resources
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.append(renderer.domElement);
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('lightblue');
+        const mesh = new THREE.Mesh(tess.geo, new THREE.MeshBasicMaterial({ color: 'black', wireframe: true }));
+        mesh.position.z = -3;
+        mesh.rotation.x = 0.7;
+        scene.add(mesh);
+        const mesh2 = new THREE.Mesh(tess.geo, new THREE.MeshStandardMaterial({ color: 'white', flatShading: true, side: THREE.DoubleSide }));
+        mesh2.position.z = -3;
+        mesh2.rotation.x = 0.7;
+        scene.add(mesh2);
+        const light = new THREE.DirectionalLight();
+        light.position.set(1, 1, 1);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight('#333'));
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100);
+        const render = () => {
+            updatePositions();
+            mesh.rotation.y += 0.005;
+            mesh2.rotation.y += 0.005;
+            renderer.render(scene, camera);
+            window.requestAnimationFrame(render);
+        }; render();
+        
+        
+        // pre-tessellate a few times
+        for (let i = 0; i < 800; ++i) {
+            mesh.geometry = mesh2.geometry = addVert(tess, true);
+        }
+        
+        
+        // update geo on keypress
+        let d = true;
+        document.addEventListener('keypress', (e) => {
+            e = e || window.event;
+            if (e.key == ' ') {
+                mesh.geometry = mesh2.geometry = addVert(tess, true);
+            }
+        });
+        
+    </script>
+</body>
+</html>
