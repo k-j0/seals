@@ -7,7 +7,6 @@ function defaultGeo (radius) {
     let indexMap = new Map();
     let indices = [];
     let vertices = [];
-    let uvs = [];
     let addVert = (x, y, z) => {
         let key = x.toFixed(2) + ',' + y.toFixed(2) + ',' + z.toFixed(2);
         if (indexMap.has(key)) {
