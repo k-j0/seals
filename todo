@@ -1,5 +1,5 @@
 
+- check hypothesis that triangles that end up very large/stretched are so as a result of particles being shared amongst lots of neighbours
 - retriangulation step for vertices shared amongst too many tris in the tessellation stage
-- noise in 3D sim
 - multithreaded implementation of the update routine
 - homogeneous growth bias
