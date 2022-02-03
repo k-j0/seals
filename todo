@@ -3,3 +3,4 @@
 - retriangulation step for vertices shared amongst too many tris in the tessellation stage
 - multithreaded implementation of the update routine
 - homogeneous growth bias
+- GPU compute implementation of the update routine
