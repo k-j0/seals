@@ -1,0 +1,5 @@
+
+- retriangulation step for vertices shared amongst too many tris in the tessellation stage
+- noise in 3D sim
+- multithreaded implementation of the update routine
+- homogeneous growth bias
