@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seals Tessellation (Delaunay)</title>
+
+    <style>
+        * {
+            border: none;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        span {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            font-size: 1.2em;
+        }
+        button {
+            display: block;
+            position: fixed;
+            margin: 20px;
+            right: 0;
+            top: 0;
+            font-size: 1.2em;
+            padding: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <script type='module'>
+        
+        import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
+        import { geoDelaunay } from "https://cdn.skypack.dev/d3-geo-voronoi@2";
+        
+        // 3D Cartesian to spherical (deg)
+        function cartesian2spherical (v3) {
+            return new THREE.Vector2( Math.atan2(v3.y, v3.x) * 180.0 / Math.PI, Math.asin(Math.max(-1, Math.min(1, v3.z))) * 180.0 / Math.PI );
+        }
+
+        // Spherical (deg) to 3D cartesian
+        function spherical2cartesian(v2) {
+            const lambda = v2.x * Math.PI / 180.0,
+                  phi = v2.y * Math.PI / 180.0,
+                  cosphi = Math.cos(phi);
+            return new THREE.Vector3(cosphi * Math.cos(lambda), cosphi * Math.sin(lambda), Math.sin(phi));
+        }
+        
+        // create set of [lat,long] points
+        const sphericalPoints = [];
+        function addPoint () {
+            // cartesian pos -> spherical coord
+            const pos = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).normalize();
+            const sph = cartesian2spherical(pos);
+            sphericalPoints.push({
+                pos: pos,
+                sph: sph
+            });
+        }
+        for (let i = 0; i < 1000; ++i) {
+            addPoint();
+        }
+        
+        // triangulate
+        function triangulate () {
+            const delaunay = geoDelaunay(sphericalPoints.map(p => [p.sph.x, p.sph.y]));
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(sphericalPoints.map(p => {
+                return [ p.pos.x, p.pos.y, p.pos.z ];
+            }).flat()), 3));
+            geo.setIndex(delaunay.triangles.map(t => [t[0], t[2], t[1]]).flat());
+            return geo;
+        }
+        const geo = triangulate();
+        
+        // prepare rendering resources
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.append(renderer.domElement);
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color('white');
+        const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 'black', wireframe: true }));
+        mesh.position.z = -3;
+        mesh.rotation.x = 0.7;
+        scene.add(mesh);
+        const mesh2 = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 'grey', opacity: 0.9, transparent: true }));
+        mesh2.position.z = -3;
+        mesh2.rotation.x = 0.7;
+        scene.add(mesh2);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 100);
+        const render = () => {
+            mesh.rotation.y += 0.005;
+            mesh2.rotation.y += 0.005;
+            renderer.render(scene, camera);
+            window.requestAnimationFrame(render);
+        }; render();
+        
+        
+        // update geo on keypress
+        let d = true;
+        document.addEventListener('keypress', (e) => {
+            e = e || window.event;
+            if (e.key == ' ') {
+                addPoint();
+                mesh.geometry = mesh2.geometry = triangulate();
+            }
+        });
+        
+    </script>
+</body>
+</html>
