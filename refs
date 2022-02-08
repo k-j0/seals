@@ -1,2 +1,4 @@
 
 Icosahedron geometry: https://github.com/mrdoob/three.js/blob/master/src/geometries/IcosahedronGeometry.js
+
+Spherical Delaunay: https://www.redblobgames.com/x/1842-delaunay-voronoi-sphere/#delaunay

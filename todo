@@ -1,5 +1,5 @@
 
-- retriangulation step for vertices shared amongst too many tris in the tessellation stage
+- tessellate using Delaunay triangulation
 - restrict simulation to 2 axes to recreate 2D version in 3D
 - spatial data structure to speed up update routine
 - multithreaded implementation of the update routine
