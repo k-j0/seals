@@ -42,7 +42,6 @@
         const attractionMagnitude = 0.02; // this is a distance
         const repulsionMagnitude = attractionMagnitude * 1.5;
         const dampening = 0.5;
-        const rigidity = 0.001;
         const dt = 0.5;
         const noise = 0.25;
         const numPoints = 10;
@@ -275,7 +274,6 @@
                     let d = (radius * 0.9 - point.position.length()) / radius;
                     point.accel.add(point.position.clone().multiplyScalar(-d * d * 0.5));
                 }
-                let avgNeighbours = new THREE.Vector2();
                 // iterate over other points (within grid)
                 let others = gridNeighbours(i);
                 for (let gridJ = 0; gridJ < others.length; ++gridJ) {
@@ -287,7 +285,6 @@
                     if (j == point.prev || j == point.next) {
                         // neighbour
                         point.accel.add(towards.normalize().multiplyScalar(d - attractionMagnitude)); // negative if close to target, positive if far from target
-                        avgNeighbours.add(other.position);
                     } else {
                         // other point
                         d *= (1 + point.n * noise);
@@ -296,8 +293,6 @@
                         }
                     }
                 }
-                avgNeighbours.multiplyScalar(1.0 / 2.0); // 2 neighbours
-                point.accel.add(new THREE.Vector2().subVectors(avgNeighbours, point.position).normalize().multiplyScalar(rigidity));
             }
 
             // update point positions
